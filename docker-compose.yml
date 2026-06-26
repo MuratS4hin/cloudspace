@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: cloudspace-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cloudspace}
+      POSTGRES_USER: ${POSTGRES_USER:-cloudspace}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cloudspace}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cloudspace} -d ${POSTGRES_DB:-cloudspace}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    container_name: cloudspace-backend
+    env_file:
+      - ./.env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-cloudspace}:${POSTGRES_PASSWORD:-cloudspace}@db:5432/${POSTGRES_DB:-cloudspace}
+      STORAGE_DIR: /data
+    volumes:
+      - storage_data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: cloudspace-frontend
+    ports:
+      - "${APP_PORT:-8080}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  storage_data:
