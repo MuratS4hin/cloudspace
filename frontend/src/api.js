@@ -52,14 +52,42 @@ export async function listFiles(token) {
   return request("/api/files", { token });
 }
 
-export async function uploadFile(token, file) {
+export async function listFilesInFolder(token, folderId) {
+  const query = folderId ? `?folder_id=${encodeURIComponent(folderId)}` : "";
+  return request(`/api/files${query}`, { token });
+}
+
+export async function listFolders(token) {
+  return request("/api/folders", { token });
+}
+
+export async function createFolder(token, name, parentId = null) {
+  return request("/api/folders", {
+    method: "POST",
+    token,
+    body: { name, parent_id: parentId },
+  });
+}
+
+export async function uploadFile(token, file, folderId = null) {
   const formData = new FormData();
   formData.append("uploaded_file", file);
+  if (folderId) {
+    formData.append("folder_id", folderId);
+  }
   return request("/api/files", { method: "POST", token, formData });
 }
 
 export async function deleteFile(token, fileId) {
   return request(`/api/files/${fileId}`, { method: "DELETE", token });
+}
+
+export async function moveFile(token, fileId, folderId = null) {
+  const formData = new FormData();
+  if (folderId) {
+    formData.append("folder_id", folderId);
+  }
+  return request(`/api/files/${fileId}/move`, { method: "PATCH", token, formData });
 }
 
 export function buildPreviewUrl(fileId, token) {

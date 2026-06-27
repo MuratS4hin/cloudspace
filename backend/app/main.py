@@ -2,8 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.database import Base, engine
-from app.routers import auth, files
+from app.database import initialize_database
+from app.routers import auth, files, folders
 from app.storage import ensure_storage_dir
 
 
@@ -21,7 +21,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup() -> None:
-    Base.metadata.create_all(bind=engine)
+    initialize_database()
     ensure_storage_dir()
 
 
@@ -32,3 +32,4 @@ def health() -> dict[str, str]:
 
 app.include_router(auth.router, prefix=settings.api_prefix)
 app.include_router(files.router, prefix=settings.api_prefix)
+app.include_router(folders.router, prefix=settings.api_prefix)

@@ -31,7 +31,26 @@ class FileResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    folder_id: uuid.UUID | None
     original_name: str
     content_type: str
     size_bytes: int
+    created_at: datetime
+
+
+class FolderCreate(BaseModel):
+    name: str
+    parent_id: uuid.UUID | None = None
+
+
+class FolderMove(BaseModel):
+    parent_id: uuid.UUID | None = None
+
+
+class FolderResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    parent_id: uuid.UUID | None
+    name: str
     created_at: datetime

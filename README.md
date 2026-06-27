@@ -4,8 +4,10 @@ CloudSpace is a self-hosted cloud storage app built with Python (FastAPI), React
 
 You can:
 - Register/login
+- Create folders and browse them like a drive
 - Upload files (videos, images, PDFs, and common file types)
 - Preview supported files inside the app
+- Move files between folders
 - Download and delete files
 
 ## Stack
