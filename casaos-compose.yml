@@ -1,0 +1,109 @@
+# CloudSpace – CasaOS custom app manifest
+# ─────────────────────────────────────────
+# How to install:
+#   CasaOS Dashboard → App Store → Custom Install → paste this file
+#   OR: copy the whole cloudspace folder to your Pi and run:
+#       docker compose -f casaos-compose.yml up -d --build
+#
+# Before starting, edit the environment values below:
+#   CHANGE_ME_PASSWORD  → strong database password
+#   CHANGE_ME_SECRET    → long random string (used to sign login tokens)
+#   STORAGE_PATH        → absolute path where you want files stored
+#   POSTGRES_DATA_PATH  → absolute path where the database lives
+
+name: cloudspace
+
+services:
+  cloudspace-db:
+    image: postgres:16-alpine
+    container_name: cloudspace-db
+    environment:
+      POSTGRES_DB: cloudspace
+      POSTGRES_USER: cloudspace
+      POSTGRES_PASSWORD: CHANGE_ME_PASSWORD
+    volumes:
+      - /DATA/AppData/cloudspace/db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudspace -d cloudspace"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - cloudspace-net
+    x-casaos:
+      envs:
+        - container: POSTGRES_PASSWORD
+          description: Database password (change this!)
+      volumes:
+        - container: /var/lib/postgresql/data
+          description: Database storage path
+
+  cloudspace-backend:
+    build:
+      context: ./backend
+    container_name: cloudspace-backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://cloudspace:CHANGE_ME_PASSWORD@cloudspace-db:5432/cloudspace
+      STORAGE_DIR: /data
+      TMPDIR: /data/.tmp_upload
+      SECRET_KEY: CHANGE_ME_SECRET
+      ACCESS_TOKEN_EXPIRE_MINUTES: "1440"
+      ALGORITHM: HS256
+      CORS_ORIGINS: "*"
+    volumes:
+      - /DATA/AppData/cloudspace/files:/data
+    depends_on:
+      cloudspace-db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - cloudspace-net
+    x-casaos:
+      envs:
+        - container: SECRET_KEY
+          description: JWT signing secret (change this!)
+        - container: ACCESS_TOKEN_EXPIRE_MINUTES
+          description: Login session length in minutes
+      volumes:
+        - container: /data
+          description: File storage path (point to your SSD/HDD/USB)
+
+  cloudspace-frontend:
+    build:
+      context: ./frontend
+    container_name: cloudspace-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - cloudspace-backend
+    restart: unless-stopped
+    networks:
+      - cloudspace-net
+    x-casaos:
+      ports:
+        - container: "80"
+          description: Web UI port
+
+networks:
+  cloudspace-net:
+    driver: bridge
+
+x-casaos:
+  architectures:
+    - arm64
+    - amd64
+  main: cloudspace-frontend
+  description:
+    en_us: Self-hosted cloud storage with folder management, file preview, and video support.
+  tagline:
+    en_us: Your personal cloud drive
+  developer: "self-hosted"
+  icon: https://cdn-icons-png.flaticon.com/512/4215/4215831.png
+  screenshot_link:
+    - https://cdn-icons-png.flaticon.com/512/4215/4215831.png
+  thumbnail: https://cdn-icons-png.flaticon.com/512/4215/4215831.png
+  title:
+    en_us: CloudSpace
+  index: /
+  port_map: "8080"

@@ -1,3 +1,14 @@
+# ---------------------------------------------------------------------------
+# STORAGE PATHS – set these in your .env file before starting:
+#
+#   STORAGE_PATH   – where uploaded files are kept
+#                    e.g. /DATA/AppData/cloudspace/files
+#                         /mnt/usb/cloudspace/files
+#
+#   POSTGRES_DATA_PATH – where the database lives
+#                    e.g. /DATA/AppData/cloudspace/db
+# ---------------------------------------------------------------------------
+
 services:
   db:
     image: postgres:16-alpine
@@ -7,7 +18,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-cloudspace}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cloudspace}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ${POSTGRES_DATA_PATH:-./data/db}:/var/lib/postgresql/data
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
@@ -26,8 +37,9 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-cloudspace}:${POSTGRES_PASSWORD:-cloudspace}@db:5432/${POSTGRES_DB:-cloudspace}
       STORAGE_DIR: /data
+      TMPDIR: /data/.tmp_upload
     volumes:
-      - storage_data:/data
+      - ${STORAGE_PATH:-./data/files}:/data
     depends_on:
       db:
         condition: service_healthy
@@ -42,7 +54,3 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
-
-volumes:
-  postgres_data:
-  storage_data:

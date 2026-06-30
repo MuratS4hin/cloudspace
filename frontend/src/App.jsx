@@ -172,12 +172,13 @@ function PreviewModal({ file, token, allFolders, onClose, onDelete, onMove }) {
 
 function FileIcon({ file, token, onOpen }) {
   const isImage = file.content_type.startsWith("image/");
-  const previewUrl = isImage ? buildPreviewUrl(file.id, token) : null;
+  const canRenderThumbnail = isImage && file.size_bytes <= 20 * 1024 * 1024;
+  const previewUrl = canRenderThumbnail ? buildPreviewUrl(file.id, token) : null;
 
   return (
     <button className="icon-item" onClick={onOpen}>
       <span className="icon-thumb">
-        {isImage
+        {canRenderThumbnail
           ? <img className="thumb-img" src={previewUrl} alt={file.original_name} loading="lazy" />
           : <span className="thumb-type-icon">{typeIcon(file.content_type)}</span>
         }
@@ -199,6 +200,7 @@ function uploadFileWithProgress(token, file, folderId, onProgress) {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/files");
     xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.timeout = 1000 * 60 * 60 * 2;
 
     xhr.upload.addEventListener("progress", (e) => {
       if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
@@ -212,6 +214,7 @@ function uploadFileWithProgress(token, file, folderId, onProgress) {
       }
     });
     xhr.addEventListener("error", () => reject(new Error("Network error during upload")));
+    xhr.addEventListener("timeout", () => reject(new Error("Upload timed out. Please try again.")));
     xhr.send(formData);
   });
 }
@@ -299,18 +302,27 @@ export default function App() {
   }
 
   async function handleUpload(e) {
-    const chosen = e.target.files?.[0];
-    if (!chosen || !token) return;
+    const chosenFiles = Array.from(e.target.files || []);
+    if (chosenFiles.length === 0 || !token) return;
     setError("");
-    setUploadProgress({ name: chosen.name, pct: 0 });
+
     try {
-      await uploadFileWithProgress(token, chosen, currentFolderId, (pct) =>
-        setUploadProgress({ name: chosen.name, pct }),
-      );
+      for (let index = 0; index < chosenFiles.length; index += 1) {
+        const chosen = chosenFiles[index];
+        await uploadFileWithProgress(token, chosen, currentFolderId, (pct) =>
+          setUploadProgress({
+            name: chosen.name,
+            pct,
+            current: index + 1,
+            total: chosenFiles.length,
+          }),
+        );
+      }
+
       await loadData();
       e.target.value = "";
     } catch (err) {
-      setError(err.message);
+      setError(`${err.message}. If the file is very large, try a stable wired connection and upload one file at a time.`);
     } finally {
       setUploadProgress(null);
     }
@@ -353,12 +365,13 @@ export default function App() {
             <input type="password" placeholder="Password" value={password}
               onChange={(e) => setPassword(e.target.value)} required />
             <button type="submit" className="btn btn-primary btn-full">
-              {mode === "login" ? "Sign in" : "Create account"}
+              Sign in
             </button>
           </form>
-          <button className="text-button" onClick={() => setMode(mode === "login" ? "register" : "login")}>
+          <p className="error-text">Account creation is disabled. Ask your admin for an account.</p>
+          {/*<button className="text-button" onClick={() => setMode(mode === "login" ? "register" : "login")}>
             {mode === "login" ? "Need an account? Register" : "Already registered? Sign in"}
-          </button>
+          </button>*/}
           {error && <p className="error-text">{error}</p>}
         </section>
       </main>
@@ -424,8 +437,8 @@ export default function App() {
                 {loading ? "…" : "↻ Refresh"}
               </button>
               <label className="btn btn-primary upload-label">
-                ↑ Upload
-                <input ref={uploadInputRef} type="file" className="upload-hidden"
+                ↑ Upload files
+                <input ref={uploadInputRef} type="file" className="upload-hidden" multiple
                   onChange={handleUpload} disabled={!!uploadProgress} />
               </label>
             </div>
@@ -434,7 +447,9 @@ export default function App() {
           {uploadProgress && (
             <div className="upload-progress-wrap">
               <div className="upload-progress-info">
-                <span>Uploading {uploadProgress.name}</span>
+                <span>
+                  Uploading {uploadProgress.current}/{uploadProgress.total}: {uploadProgress.name}
+                </span>
                 <span>{uploadProgress.pct}%</span>
               </div>
               <div className="upload-progress-track">
@@ -478,8 +493,8 @@ export default function App() {
               <span className="empty-icon">📂</span>
               <p>This folder is empty</p>
               <label className="btn btn-primary upload-label">
-                Upload a file
-                <input type="file" className="upload-hidden" onChange={handleUpload} disabled={!!uploadProgress} />
+                Upload files
+                <input type="file" className="upload-hidden" multiple onChange={handleUpload} disabled={!!uploadProgress} />
               </label>
             </div>
           )}
